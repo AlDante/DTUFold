@@ -6,11 +6,11 @@ alphafold
 #alphafold.model
 #alphafold.relax
 datetime
-google.colab
-hashlib
+#google.colab
+#hashlib
 ipywidgets
-itertools
-json
+#itertools
+#json
 jsonpickle
 matplotlib
 numpy

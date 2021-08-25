@@ -1,7 +1,7 @@
 
 #@title Procedure write_citations()
 
-def write_citations(use_msa, use_custom_msa, use_env, use_templates, use_amber, jobname):
+def write_citations(jobname:str, use_msa:bool=False, use_custom_msa:bool=False, use_env:bool=False, use_templates:bool=False, use_amber:bool=False):
 
   citations = {
     "Ovchinnikov2021":  """@software{Ovchinnikov2021,

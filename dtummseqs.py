@@ -5,14 +5,17 @@
 ##########################################
 
 import os
-import time
 import random
+import tarfile
+import time
+
 import requests
 import tqdm.notebook
 
 TQDM_BAR_FORMAT = '{l_bar}{bar}| {n_fmt}/{total_fmt} [elapsed: {elapsed} remaining: {remaining}]'
 
-def process_homooligomers(msa, deletion_matrix, homooligomer:int=1):
+
+def process_homooligomers(msa, deletion_matrix, homooligomer: int = 1):
     """
 
     :param msa: query sequence to align with

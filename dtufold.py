@@ -7,12 +7,11 @@
   where ...
 
 """
-import os
-import sys
-import shutil
-
-import traceback  # for error dumps
 import json  # for error dumps
+import os
+import shutil
+import sys
+import traceback  # for error dumps
 from pathlib import Path
 
 import tensorflow as tf
@@ -24,7 +23,7 @@ from dtufasta_iter import fasta_iter
 from dtufileutils import save_results, zip_job_results
 from dtummseqs import run_mmseqs2, process_homooligomers
 from dtuplots import make_plots, show_pdb, plot_confidence, plot_plddt_legend
-from dtupredict_structure import predict_structure
+from dtupredict_structure import predict_structure, collect_model_weights
 from dtutemplates import mk_template, mk_mock_template
 from dtutimecheck import time_check
 
@@ -71,13 +70,14 @@ def show_this_run():
 
 
 # @markdown ### Procedure: Write log file headers
-def write_log_headers(text_file):
-    text_file.write("num_models=%s\n" % num_models)
-    text_file.write("use_amber=%s\n" % use_amber)
-    text_file.write("use_msa=%s\n" % use_msa)
-    text_file.write("msa_mode=%s\n" % msa_mode)
-    text_file.write("use_templates=%s\n" % use_templates)
-    text_file.write("homooligomer=%s\n" % homooligomer)
+def write_log_headers(jobname):
+    with open(f"{jobname}.log", "w") as log_file:
+        log_file.write("num_models=%s\n" % num_models)
+        log_file.write("use_amber=%s\n" % use_amber)
+        log_file.write("use_msa=%s\n" % use_msa)
+        log_file.write("msa_mode=%s\n" % msa_mode)
+        log_file.write("use_templates=%s\n" % use_templates)
+        log_file.write("homooligomer=%s\n" % homooligomer)
 
 
 def write_err(jobname, query_sequence, feature_dict, use_model):
@@ -102,9 +102,6 @@ if "model" not in dir():
     tf.get_logger().setLevel('ERROR')
 
     from alphafold.data import pipeline
-    from alphafold.model import data
-    from alphafold.model import config
-    from alphafold.model import model
 
     # plotting libraries
 
@@ -114,9 +111,16 @@ if "relax" not in dir():
 # @title Main loop
 
 
-# Start processing
-model_params = {}
+#################################################
+# @title Gather input features, predict structure
 
+# collect model weights
+use_model, model_config, model_params, model_runner_1, model_runner_3 = collect_model_weights(num_models)
+
+time_check("Model weights collected: ")
+#################################################
+
+# Start processing
 fiter = fasta_iter(fasta_path)
 loop_count = 0  # for debugging
 
@@ -157,30 +161,7 @@ for ff in fiter:
     with open(f"{jobname}.fasta", "w") as text_file:
         text_file.write(">1\n%s" % query_sequence)
 
-    with open(f"{jobname}.log", "w") as log_file:
-        write_log_headers(log_file)
-
-    #################################################
-    # @title Gather input features, predict structure
-
-    # collect model weights
-    # use_model, model_config, model_params, model_runner_1, model_runner_3 = collect_model_weights(num_models)
-    use_model = {}
-    if "model_params" not in dir(): model_params = {}
-    for model_name in ["model_1", "model_2", "model_3", "model_4", "model_5"][:num_models]:
-        use_model[model_name] = True
-        if model_name not in model_params:
-            model_params[model_name] = data.get_model_haiku_params(model_name=model_name + "_ptm", data_dir=".")
-            if model_name == "model_1":
-                model_config = config.model_config(model_name + "_ptm")
-                model_config.data.eval.num_ensemble = 1
-                model_runner_1 = model.RunModel(model_config, model_params[model_name])
-            if model_name == "model_3":
-                model_config = config.model_config(model_name + "_ptm")
-                model_config.data.eval.num_ensemble = 1
-                model_runner_3 = model.RunModel(model_config, model_params[model_name])
-
-    time_check("Model weights collected: ")
+    write_log_headers(jobname)
 
     #################################################
     # parse TEMPLATES
@@ -212,16 +193,19 @@ for ff in fiter:
     # predict_structure can throw exceptions
     # ValueError: Amber minimization can only be performed on proteins with well-defined residues.
     # This protein contains at least one residue with no atoms.
+    # noinspection PyBroadException
     try:
-        outs = predict_structure(jobname, feature_dict,
+        outs = predict_structure(jobname, model_runner_1, model_runner_3, feature_dict,
                                  Ls=[len(query_sequence)] * homooligomer,
-                                 model_params=model_params, use_model=use_model,
+                                 model_params=model_params,
+                                 use_model=use_model,
                                  do_relax=use_amber)
-    except:
+    except Exception:
 
         # Here if error. Save as much as we can about it
         write_err(jobname, query_sequence, feature_dict, use_model)
-        write_citations(use_msa, use_env, use_templates, use_amber, jobname)
+        write_citations(jobname, use_msa=use_msa, use_custom_msa=False, use_env=use_env, use_templates=use_templates,
+                        use_amber=use_amber)
         zip_job_results(jobname, results_dir, a3m_dir)
 
         # Traceback uses sys.exc_info() to get current exception so no need to pass it in
@@ -244,8 +228,9 @@ for ff in fiter:
     # Display the models with vw.show(), plconfi.show() and plddt.show() respectively
     make_plots(msa, jobname, query_sequence, outs, homooligomer, num_models)
     for model_num in range(1, num_models + 1):
-        vw = show_pdb(model_num, show_sidechains, show_mainchains, color)
-        #def plot_confidence(Ln, plddt, pae, model_num=1, homooligomer=1):
+        vw = show_pdb(jobname, model_num, homooligomer, use_amber, show_mainchains, show_sidechains, color)
+        # def plot_confidence(Ln, plddt, pae, model_num=1, homooligomer=1):
+        model_name = f"model_{model_num}"
         plconfi = plot_confidence(len(query_sequence), outs[model_name]["plddt"], outs[model_name]["pae"],
                                   homooligomer)
 
@@ -253,6 +238,8 @@ for ff in fiter:
         plddt = plot_plddt_legend()
 
     # Save results
-    write_citations(use_msa, use_custom_msa, use_env, use_templates, use_amber, jobname)
+    write_citations(jobname, use_msa=use_msa, use_custom_msa=False, use_env=use_env, use_templates=use_templates,
+                    use_amber=use_amber)
+
     zip_job_results(jobname, results_dir, a3m_dir)
     time_check("Sequence processed")

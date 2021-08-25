@@ -30,12 +30,21 @@
 
 """
 
-
 # @title Procedure: Set B-Factor
 from string import ascii_uppercase
 
+import alphafold.model.model
+import haiku
+import numpy as np
+from alphafold.common import protein
+from alphafold.model import config
+from alphafold.model import data
+from alphafold.model import features as affeatures
+from alphafold.model import model
+from alphafold.relax import relax
 
-def set_bfactor(pdb_filename, bfac, idx_res, chains):
+
+def set_bfactor(pdb_filename, bfac: list[float], idx_res: list[str], chains: list[str]):
     """Store B-factor in PDB file.
 
     AlphaFold produces a per-residue estimate of its confidence on a scale from 0 - 100 . This confidence measure is
@@ -43,9 +52,9 @@ def set_bfactor(pdb_filename, bfac, idx_res, chains):
     fields of the mmCIF and PDB files available for download (although unlike a B-factor, higher pLDDT is better).
 
     :param str pdb_filename: Name of PDB file.
-    :param int bfac: B-Factor.
-    :param int idx_res: Peptide sequence.
-    :param int chains: Peptide sequence.
+    :param list[float] bfac: B-Factor.
+    :param list[str] idx_res: List of residues.
+    :param list[str] chains: Peptide sequence per chain.
 
     :example:
 
@@ -63,35 +72,43 @@ def set_bfactor(pdb_filename, bfac, idx_res, chains):
     O.close()
 
 
-
-#@title Function collect_model_weights()
+# @title Function collect_model_weights()
 def collect_model_weights(num_models):
-  use_model = {}
-  if "model_params" not in dir(): model_params = {}
-  for model_name in ["model_1","model_2","model_3","model_4","model_5"][:num_models]:
-    use_model[model_name] = True
-    if model_name not in model_params:
-      model_params[model_name] = data.get_model_haiku_params(model_name=model_name+"_ptm", data_dir=".")
-      if model_name == "model_1":
-        model_config = config.model_config(model_name+"_ptm")
-        model_config.data.eval.num_ensemble = 1
-        model_runner_1 = model.RunModel(model_config, model_params[model_name])
-      if model_name == "model_3":
-        model_config = config.model_config(model_name+"_ptm")
-        model_config.data.eval.num_ensemble = 1
-        model_runner_3 = model.RunModel(model_config, model_params[model_name])
-    return use_model, model_config, model_params, model_runner_1, model_runner_3
-
+    use_model = {}
+    # Model_runner_1 is used for models 1 and 2
+    # Model_runner_3 is used for models 3, 4 and 5
+    model_runner_1 = None
+    model_runner_3 = None
+    # if "model_params" not in dir(): model_params = {}
+    model_params = {}
+    for model_name in ["model_1", "model_2", "model_3", "model_4", "model_5"][:num_models]:
+        use_model[model_name] = True
+        if model_name not in model_params:
+            model_params[model_name] = data.get_model_haiku_params(model_name=model_name + "_ptm", data_dir=".")
+            if model_name == "model_1":
+                model_config = config.model_config(model_name + "_ptm")
+                model_config.data.eval.num_ensemble = 1
+                model_runner_1 = model.RunModel(model_config, model_params[model_name])
+            if model_name == "model_3":
+                model_config = config.model_config(model_name + "_ptm")
+                model_config.data.eval.num_ensemble = 1
+                model_runner_3 = model.RunModel(model_config, model_params[model_name])
+        return use_model, model_config, model_params, model_runner_1, model_runner_3
 
 
 # @title Function: Predict Structure
-def predict_structure(prefix, feature_dict, Ls, model_params, use_model, do_relax=False, random_seed=0):
+def predict_structure(prefix, model_runner_1: alphafold.model.model.RunModel,
+                      model_runner_3: alphafold.model.model.RunModel,
+                      feature_dict, Ls: list[int], model_params: haiku.Params, use_model, do_relax=False,
+                      random_seed=0):
     """Predicts structure using AlphaFold for the given sequence.
 
-    :param int prefix: Job name.
-    :param int feature_dict: Features.
-    :param int Ls: Sequence length.
-    :param int model_params: Model parameters.
+    :param str prefix: Job name.
+    :param alphafold.model.model.RunModel model_runner_1: Model_runner_1 is used for models 1 and 2.
+    :param alphafold.model.model.RunModel model_runner_3: Model_runner_3 is used for models 3, 4 and 5.
+    :param dict feature_dict: Features.
+    :param list[int] Ls: Number of residues in each chain. I.e. for two homooligomers of length 10, a list [10,10s]
+    :param haiku.Params: model_params: Model parameters.
     :param bool use_model: Whether to use the model.
     :param bool do_relax: Whether to use Amber relaxation.
     :param int random_seed: Random seed.
@@ -132,18 +149,20 @@ def predict_structure(prefix, feature_dict, Ls, model_params, use_model, do_rela
             if any(str(m) in model_name for m in [3, 4, 5]): model_runner = model_runner_3
             model_runner.params = params
 
-            processed_feature_dict = model_runner.process_features(feature_dict, random_seed=random_seed)
-            prediction_result = model_runner.predict(processed_feature_dict)
-            unrelaxed_protein = protein.from_prediction(processed_feature_dict, prediction_result)
+            processed_feature_dict: affeatures.FeatureDict = model_runner.process_features(feature_dict,
+                                                                                           random_seed=random_seed)
+            # prediction_result is a dictionary of NumPy feature arrays
+            prediction_result: dict = model_runner.predict(processed_feature_dict)
+            unrelaxed_protein: protein.Protein = protein.from_prediction(processed_feature_dict, prediction_result)
             unrelaxed_pdb_lines.append(protein.to_pdb(unrelaxed_protein))
             plddts.append(prediction_result['plddt'])
             paes.append(prediction_result['predicted_aligned_error'])
 
             if do_relax:
                 # Relax the prediction.
-                amber_relaxer = relax.AmberRelaxation(max_iterations=0, tolerance=2.39,
-                                                      stiffness=10.0, exclude_residues=[],
-                                                      max_outer_iterations=20)
+                amber_relaxer: relax.AmberRelaxation = relax.AmberRelaxation(max_iterations=0, tolerance=2.39,
+                                                                             stiffness=10.0, exclude_residues=[],
+                                                                             max_outer_iterations=20)
                 relaxed_pdb_str, _, _ = amber_relaxer.process(prot=unrelaxed_protein)
                 relaxed_pdb_lines.append(relaxed_pdb_str)
 
@@ -166,4 +185,3 @@ def predict_structure(prefix, feature_dict, Ls, model_params, use_model, do_rela
 
         out[f"model_{n + 1}"] = {"plddt": plddts[r], "pae": paes[r]}
     return out
-
