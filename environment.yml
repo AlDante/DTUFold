@@ -1,0 +1,18 @@
+name: dtufold
+dependencies:
+  - absl-py
+  - alphafold
+  - datetime
+  - ipywidgets
+  - jsonpickle
+  - matplotlib
+  - numpy
+  - oauth2client
+  - pathlib
+  - py3Dmol
+  - pydrive
+  - requests
+  - simtk
+  - tensorflow
+  - tqdm
+

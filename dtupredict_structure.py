@@ -33,7 +33,7 @@
 # @title Procedure: Set B-Factor
 from string import ascii_uppercase
 
-import alphafold.model.model
+import alphafold
 import haiku
 import numpy as np
 from alphafold.common import protein
@@ -82,6 +82,7 @@ def collect_model_weights(num_models):
     # if "model_params" not in dir(): model_params = {}
     model_params = {}
     for model_name in ["model_1", "model_2", "model_3", "model_4", "model_5"][:num_models]:
+        print(f"configuring {model_name}")
         use_model[model_name] = True
         if model_name not in model_params:
             model_params[model_name] = data.get_model_haiku_params(model_name=model_name + "_ptm", data_dir=".")
@@ -93,7 +94,7 @@ def collect_model_weights(num_models):
                 model_config = config.model_config(model_name + "_ptm")
                 model_config.data.eval.num_ensemble = 1
                 model_runner_3 = model.RunModel(model_config, model_params[model_name])
-        return use_model, model_config, model_params, model_runner_1, model_runner_3
+    return use_model, model_config, model_params, model_runner_1, model_runner_3
 
 
 # @title Function: Predict Structure
@@ -139,6 +140,8 @@ def predict_structure(prefix, model_runner_1: alphafold.model.model.RunModel,
     plddts, paes = [], []
     unrelaxed_pdb_lines = []
     relaxed_pdb_lines = []
+
+    print(f"Use_model {use_model}")
 
     for model_name, params in model_params.items():
         if model_name in use_model:

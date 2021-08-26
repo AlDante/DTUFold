@@ -672,3 +672,22 @@ def plot_protein(protein=None, pos=None, plddt=None, Ls=None, dpi=100, best_view
         add_text("colored by pLDDT", ax2)
 
     return fig
+
+#@title Gather input features, predict structure
+from string import ascii_uppercase
+
+# collect model weights
+use_model = {}
+if "model_params" not in dir(): model_params = {}
+for model_name in ["model_1","model_2","model_3","model_4","model_5"][:num_models]:
+  use_model[model_name] = True
+  if model_name not in model_params:
+    model_params[model_name] = data.get_model_haiku_params(model_name=model_name+"_ptm", data_dir=".")
+    if model_name == "model_1":
+      model_config = config.model_config(model_name+"_ptm")
+      model_config.data.eval.num_ensemble = 1
+      model_runner_1 = model.RunModel(model_config, model_params[model_name])
+    if model_name == "model_3":
+      model_config = config.model_config(model_name+"_ptm")
+      model_config.data.eval.num_ensemble = 1
+      model_runner_3 = model.RunModel(model_config, model_params[model_name])

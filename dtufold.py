@@ -39,12 +39,6 @@ use_templates = True
 # Do not process homooligomers
 homooligomer = 1
 
-# @title Open FASTA file. This contains the 2000-odd sequences marked as toxins.
-fasta_dir = '/content/drive/MyDrive/Shared/DTU'
-fasta_filename = 'uniprot-taxonomy_8570+keyword_toxin+reviewed_yes.fasta'
-fasta_path = os.path.join(fasta_dir, fasta_filename)
-results_dir = '/content/drive/MyDrive/Shared/DTU/results_new/'
-
 
 def show_this_run():
     """ Display some useful information about the run"""
@@ -88,6 +82,16 @@ def write_err(jobname, query_sequence, feature_dict, use_model):
         json.dump(list(feature_dict), err_file)
         json.dump(use_model, err_file)
 
+# @title Open FASTA file. This contains the 2000-odd sequences marked as toxins.
+if 'COLAB_GPU' in os.environ:
+    fasta_dir = '/content/drive/MyDrive/Shared/DTU'
+    results_dir = '/content/drive/MyDrive/Shared/DTU/results_new/'
+else:
+    fasta_dir = 'fasta'
+    results_dir = 'results_dtu/'
+
+fasta_filename = 'uniprot-taxonomy_8570+keyword_toxin+reviewed_yes.fasta'
+fasta_path = os.path.join(fasta_dir, fasta_filename)
 
 # @title Import libraries
 # setup the model
@@ -117,7 +121,7 @@ if "relax" not in dir():
 # collect model weights
 use_model, model_config, model_params, model_runner_1, model_runner_3 = collect_model_weights(num_models)
 
-time_check("Model weights collected: ")
+time_check(f"Model weights collected: {num_models}{use_model}")
 #################################################
 
 # Start processing
