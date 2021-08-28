@@ -1,18 +1,27 @@
 name: dtufold
+channels:
+  - conda-forge
 dependencies:
   - absl-py
-  - alphafold
-  - datetime
+#  - alphafold
+#  - datetime
+# - Bio
+  - biopython
+  - cudatoolkit
+  - dm-haiku
+  - dm-tree
   - ipywidgets
   - jsonpickle
   - matplotlib
+#  - ml-collections
   - numpy
   - oauth2client
+  - openmm=7.5.1
   - pathlib
+  - pdbfixer
   - py3Dmol
   - pydrive
   - requests
-  - simtk
-  - tensorflow
+  - tensorflow-gpu
   - tqdm
 

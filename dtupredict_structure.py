@@ -94,7 +94,7 @@ def collect_model_weights(num_models):
                 model_config = config.model_config(model_name + "_ptm")
                 model_config.data.eval.num_ensemble = 1
                 model_runner_3 = model.RunModel(model_config, model_params[model_name])
-    return use_model, model_config, model_params, model_runner_1, model_runner_3
+        return use_model, model_config, model_params, model_runner_1, model_runner_3
 
 
 # @title Function: Predict Structure
