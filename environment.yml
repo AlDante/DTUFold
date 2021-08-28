@@ -19,6 +19,7 @@ dependencies:
   - openmm=7.5.1
   - pathlib
   - pdbfixer
+  - psutil
   - py3Dmol
   - pydrive
   - requests
