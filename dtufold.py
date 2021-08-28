@@ -176,6 +176,8 @@ for ff in fiter:
 
     #################################################
     # parse MSA
+    time_check("Matching sequences: ")
+
     prefix = dtuhash.add_hash('tmp', query_sequence)
 
     a3m_dir = prefix + "_env" if use_env else prefix
